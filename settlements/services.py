@@ -3,18 +3,11 @@ from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
 
-from company.models import CompanyWallet
+from company.models import CompanyWallet, CompanyWalletTransaction
 from ledgers.models import ResultPeriod
 from receipts.models import Receipt, ReceiptItem
 from settlements.models import SettlementBatch, SettlementItem, SettlementItemSource
-
-
-def calculate_total_collected(result_period):
-    return (
-        Receipt.objects
-        .filter(result_period=result_period, status=Receipt.Status.PAID)
-        .aggregate_total()
-    )
+from wallets.models import UserWallet, WalletTransaction
 
 
 def get_total_collected(result_period):
@@ -31,13 +24,8 @@ def get_total_collected(result_period):
 def create_settlement_preview(result_period: ResultPeriod, result_number: str, admin_user):
     """
     Creates settlement preview for one result period.
-
-    Rules:
-    - One result number per result period.
-    - Result number must be 000-999.
-    - Settlement preview can only be created once unless previous one is voided.
-    - User wallet is NOT credited yet.
-    - Admin must approve settlement later.
+    User wallet is NOT credited yet.
+    Admin must approve settlement later.
     """
 
     result_number = str(result_number).strip()
@@ -77,16 +65,14 @@ def create_settlement_preview(result_period: ResultPeriod, result_number: str, a
         settlement_items_by_user[user_id]["matched_amount"] += item.amount
         settlement_items_by_user[user_id]["sources"].append(item)
 
-    total_settlement = Decimal("0.00")
-
-    # If multiple ledgers exist, use weighted/simple approach:
-    # for now use the first ledger settlement rate from the result period.
     first_ledger = result_period.ledgers.order_by("priority_order", "id").first()
 
     if not first_ledger:
         raise ValueError("No ledger found for this result period.")
 
     settlement_rate = first_ledger.settlement_rate
+
+    total_settlement = Decimal("0.00")
 
     for data in settlement_items_by_user.values():
         total_settlement += data["matched_amount"] * settlement_rate
@@ -152,5 +138,100 @@ def create_settlement_preview(result_period: ResultPeriod, result_number: str, a
             "updated_at",
         ]
     )
+
+    return batch
+
+
+@transaction.atomic
+def approve_settlement(batch: SettlementBatch, admin_user):
+    """
+    Approves and pays a settlement batch.
+    If reserve is required, company wallet must have enough balance.
+    """
+
+    batch = SettlementBatch.objects.select_for_update().get(id=batch.id)
+
+    if batch.status == SettlementBatch.Status.PAID:
+        raise ValueError("Settlement batch is already paid.")
+
+    if batch.status == SettlementBatch.Status.VOIDED:
+        raise ValueError("Voided settlement batch cannot be approved.")
+
+    company_wallet = CompanyWallet.objects.select_for_update().first()
+
+    if batch.company_reserve_required > 0:
+        if not company_wallet:
+            raise ValueError("Company wallet does not exist.")
+
+        if company_wallet.balance < batch.company_reserve_required:
+            raise ValueError(
+                f"Insufficient company reserve. Required: {batch.company_reserve_required}, "
+                f"Available: {company_wallet.balance}"
+            )
+
+        reserve_before = company_wallet.balance
+        company_wallet.balance -= batch.company_reserve_required
+        company_wallet.save(update_fields=["balance", "updated_at"])
+
+        CompanyWalletTransaction.objects.create(
+            company_wallet=company_wallet,
+            transaction_type=CompanyWalletTransaction.TransactionType.SETTLEMENT_FUNDING,
+            amount=batch.company_reserve_required,
+            balance_before=reserve_before,
+            balance_after=company_wallet.balance,
+            reference_table="settlement_batches",
+            reference_id=batch.id,
+            description=f"Settlement funding for {batch.result_period.code}",
+            created_by=admin_user,
+        )
+
+        batch.company_reserve_used = batch.company_reserve_required
+
+    settlement_items = batch.items.select_related("user")
+
+    for item in settlement_items:
+        if item.status == SettlementItem.Status.PAID:
+            continue
+
+        wallet = UserWallet.objects.select_for_update().get(user=item.user)
+
+        balance_before = wallet.balance
+        wallet.balance += item.settlement_amount
+        wallet.save(update_fields=["balance", "updated_at"])
+
+        wallet_tx = WalletTransaction.objects.create(
+            wallet=wallet,
+            user=item.user,
+            transaction_type=WalletTransaction.TransactionType.SETTLEMENT_CREDIT,
+            amount=item.settlement_amount,
+            balance_before=balance_before,
+            balance_after=wallet.balance,
+            reference_table="settlement_items",
+            reference_id=item.id,
+            description=f"Settlement credit for {batch.result_period.code}",
+            created_by=admin_user,
+        )
+
+        item.wallet_transaction = wallet_tx
+        item.status = SettlementItem.Status.PAID
+        item.paid_at = timezone.now()
+        item.save(update_fields=["wallet_transaction", "status", "paid_at"])
+
+    batch.status = SettlementBatch.Status.PAID
+    batch.approved_by = admin_user
+    batch.approved_at = timezone.now()
+    batch.paid_at = timezone.now()
+    batch.save(
+        update_fields=[
+            "status",
+            "approved_by",
+            "approved_at",
+            "paid_at",
+            "company_reserve_used",
+        ]
+    )
+
+    batch.result_period.status = ResultPeriod.Status.SETTLED
+    batch.result_period.save(update_fields=["status", "updated_at"])
 
     return batch
