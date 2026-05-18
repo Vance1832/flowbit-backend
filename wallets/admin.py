@@ -34,9 +34,25 @@ class WalletTransactionAdmin(admin.ModelAdmin):
 
 @admin.register(DepositRequest)
 class DepositRequestAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "amount", "status", "reviewed_by", "reviewed_at", "created_at")
-    list_filter = ("status", "created_at", "reviewed_at")
-    search_fields = ("user__name", "user__phone")
+    list_display = (
+        "id",
+        "user",
+        "amount",
+        "payment_method",
+        "transaction_reference",
+        "status",
+        "assigned_to",
+        "reviewed_by",
+        "reviewed_at",
+        "created_at",
+    )
+    list_filter = ("status", "payment_method", "assigned_to", "created_at", "reviewed_at")
+    search_fields = (
+        "user__name",
+        "user__phone",
+        "sender_account_name",
+        "transaction_reference",
+    )
     readonly_fields = ("created_at", "updated_at")
 
 

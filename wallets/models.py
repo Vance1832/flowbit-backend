@@ -66,6 +66,7 @@ class WalletTransaction(models.Model):
 class DepositRequest(models.Model):
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
+        IN_REVIEW = "in_review", "In Review"
         APPROVED = "approved", "Approved"
         REJECTED = "rejected", "Rejected"
 
@@ -81,6 +82,18 @@ class DepositRequest(models.Model):
     )
 
     amount = models.DecimalField(max_digits=18, decimal_places=2)
+    payment_method = models.CharField(max_length=100, null=True, blank=True)
+    sender_account_name = models.CharField(max_length=150, null=True, blank=True)
+    transaction_reference = models.CharField(max_length=150, null=True, blank=True)
+
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="assigned_deposit_requests",
+    )
+    assigned_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
 
     proof_image_url = models.URLField(max_length=500, null=True, blank=True)
