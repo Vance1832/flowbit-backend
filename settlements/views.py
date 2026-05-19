@@ -2,7 +2,7 @@ from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
-from accounts.permissions import IsAdminOwner
+from accounts.permissions import IsAdminOwner, IsOwner
 from .models import SettlementBatch
 from .serializers import SettlementBatchSerializer
 from .services import approve_settlement
@@ -23,7 +23,7 @@ class AdminSettlementBatchDetailView(generics.RetrieveAPIView):
 
 
 @api_view(["POST"])
-@permission_classes([IsAdminOwner])
+@permission_classes([IsOwner])
 def admin_approve_settlement(request, pk):
     batch = SettlementBatch.objects.get(pk=pk)
 

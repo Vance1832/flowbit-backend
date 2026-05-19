@@ -10,6 +10,7 @@ from .serializers import UserRegisterSerializer, UserProfileSerializer
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+    permission_classes = [permissions.AllowAny]
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()

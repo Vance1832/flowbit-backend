@@ -1,28 +1,37 @@
 from rest_framework import permissions
+from .models import User
 
 
-class IsStaffAdminOwner(permissions.BasePermission):
+class RolePermission(permissions.BasePermission):
+    allowed_roles = ()
+    message = "You do not have permission to perform this action."
+
     def has_permission(self, request, view):
-        return (
-            request.user
-            and request.user.is_authenticated
-            and request.user.role in ["staff", "admin", "owner"]
+        user = request.user
+        return bool(
+            user
+            and user.is_authenticated
+            and user.role in self.allowed_roles
         )
 
 
-class IsAdminOwner(permissions.BasePermission):
-    def has_permission(self, request, view):
-        return (
-            request.user
-            and request.user.is_authenticated
-            and request.user.role in ["admin", "owner"]
-        )
+class IsStaffAdminOwner(RolePermission):
+    allowed_roles = (
+        User.Role.STAFF,
+        User.Role.ADMIN,
+        User.Role.OWNER,
+    )
+    message = "Only staff, admin, or owner users can access this endpoint."
 
 
-class IsOwner(permissions.BasePermission):
-    def has_permission(self, request, view):
-        return (
-            request.user
-            and request.user.is_authenticated
-            and request.user.role == "owner"
-        )
+class IsAdminOwner(RolePermission):
+    allowed_roles = (
+        User.Role.ADMIN,
+        User.Role.OWNER,
+    )
+    message = "Only admin or owner users can access this endpoint."
+
+
+class IsOwner(RolePermission):
+    allowed_roles = (User.Role.OWNER,)
+    message = "Only owner users can access this endpoint."
