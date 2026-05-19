@@ -22,7 +22,9 @@ class ResultPeriodAdmin(admin.ModelAdmin):
         "created_by",
         "created_at",
         "updated_at",
+        "result_entered_by",
         "result_entered_at",
+        "result_voided_by",
         "result_voided_at",
     )
 
@@ -53,6 +55,7 @@ class LedgerAdmin(admin.ModelAdmin):
         "created_by",
         "created_at",
         "updated_at",
+        "manually_closed_by",
         "manually_closed_at",
     )
 
@@ -90,4 +93,9 @@ class LedgerPriorityHistoryAdmin(admin.ModelAdmin):
     )
     list_filter = ("changed_at",)
     search_fields = ("ledger__name", "changed_by__name")
-    readonly_fields = ("changed_at",)
+    readonly_fields = ("changed_by", "changed_at")
+
+    def save_model(self, request, obj, form, change):
+        if not obj.changed_by_id:
+            obj.changed_by = request.user
+        super().save_model(request, obj, form, change)

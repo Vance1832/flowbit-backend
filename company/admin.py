@@ -23,7 +23,12 @@ class CompanyWalletTransactionAdmin(admin.ModelAdmin):
     )
     list_filter = ("transaction_type", "created_at")
     search_fields = ("company_wallet__name", "description")
-    readonly_fields = ("created_at",)
+    readonly_fields = ("created_by", "created_at")
+
+    def save_model(self, request, obj, form, change):
+        if not obj.created_by_id:
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(CompanyCashoutRequest)
@@ -41,4 +46,16 @@ class CompanyCashoutRequestAdmin(admin.ModelAdmin):
     )
     list_filter = ("status", "created_at", "approved_at", "paid_at")
     search_fields = ("requested_by__name", "approved_by__name", "reason", "admin_note")
-    readonly_fields = ("created_at", "updated_at")
+    readonly_fields = (
+        "requested_by",
+        "approved_by",
+        "approved_at",
+        "paid_at",
+        "created_at",
+        "updated_at",
+    )
+
+    def save_model(self, request, obj, form, change):
+        if not obj.requested_by_id:
+            obj.requested_by = request.user
+        super().save_model(request, obj, form, change)

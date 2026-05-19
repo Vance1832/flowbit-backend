@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils import timezone
 from .models import SettlementBatch, SettlementItem, SettlementItemSource
 
 
@@ -27,8 +28,24 @@ class SettlementBatchAdmin(admin.ModelAdmin):
     )
     list_filter = ("status", "result_period", "previewed_at", "approved_at")
     search_fields = ("result_period__code", "result_number")
-    readonly_fields = ("created_at",)
+    readonly_fields = (
+        "previewed_by",
+        "previewed_at",
+        "approved_by",
+        "approved_at",
+        "paid_at",
+        "voided_by",
+        "voided_at",
+        "created_at",
+    )
     inlines = [SettlementItemInline]
+
+    def save_model(self, request, obj, form, change):
+        if not obj.previewed_by_id:
+            obj.previewed_by = request.user
+        if not obj.previewed_at:
+            obj.previewed_at = timezone.now()
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(SettlementItem)

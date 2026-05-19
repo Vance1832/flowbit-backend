@@ -28,7 +28,7 @@ class ReceiptAdmin(admin.ModelAdmin):
     )
     list_filter = ("status", "result_period", "paid_at")
     search_fields = ("receipt_no", "user__name", "user__phone")
-    readonly_fields = ("created_at",)
+    readonly_fields = ("voided_by", "voided_at", "created_at")
     inlines = [ReceiptItemInline]
 
 
