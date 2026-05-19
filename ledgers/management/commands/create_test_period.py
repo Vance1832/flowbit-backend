@@ -10,6 +10,7 @@ from ledgers.models import Ledger, LedgerNumber, LedgerPriorityHistory, ResultPe
 from receipts.models import PaidNumberAllocation, RGeneratedGroup, RGeneratedItem, Receipt, ReceiptItem
 from settlements.models import SettlementBatch, SettlementItem, SettlementItemSource
 from wallets.models import UserWallet, WalletTransaction
+from ._dev_db import ensure_dev_database_ready
 
 
 class Command(BaseCommand):
@@ -22,6 +23,8 @@ class Command(BaseCommand):
     DEFAULT_CLOSE_TIME = time(15, 0, 0)
 
     def handle(self, *args, **options):
+        ensure_dev_database_ready(self.stdout)
+
         owner_user = User.objects.filter(role=User.Role.OWNER).order_by("id").first()
 
         if not owner_user:

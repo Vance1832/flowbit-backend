@@ -63,6 +63,8 @@ def create_paid_receipt(user, result_period, raw_items):
     ]
     """
 
+    result_period = result_period.__class__.objects.select_for_update().get(id=result_period.id)
+
     if result_period.status != "open":
         raise ValueError("This result period is not open.")
 

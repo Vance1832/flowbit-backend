@@ -18,6 +18,7 @@ from settlements.models import SettlementBatch, SettlementItem
 from settlements.services import approve_settlement
 from wallets.models import DepositRequest, UserWallet, WalletTransaction, WithdrawalRequest
 from wallets.services import approve_deposit_request
+from ._dev_db import ensure_dev_database_ready
 
 
 class Command(BaseCommand):
@@ -32,6 +33,8 @@ class Command(BaseCommand):
     DEPOSIT_AMOUNT = Decimal("50000.00")
 
     def handle(self, *args, **options):
+        ensure_dev_database_ready(self.stdout)
+
         run_started_at = timezone.now()
 
         owner_user = User.objects.filter(role=User.Role.OWNER).order_by("id").first()
