@@ -98,3 +98,126 @@ def reject_deposit_request(deposit_request: DepositRequest, staff_user, staff_no
     )
 
     return deposit_request
+
+@transaction.atomic
+def approve_withdrawal_request(withdrawal_request: WithdrawalRequest, staff_user, staff_note=None):
+    withdrawal_request = WithdrawalRequest.objects.select_for_update().get(id=withdrawal_request.id)
+
+    if withdrawal_request.status != WithdrawalRequest.Status.PENDING:
+        raise ValueError("Only pending withdrawals can be approved.")
+
+    wallet = UserWallet.objects.select_for_update().get(id=withdrawal_request.wallet_id)
+
+    if wallet.balance < withdrawal_request.amount:
+        raise ValueError("Insufficient wallet balance.")
+
+    wallet.balance -= withdrawal_request.amount
+    wallet.locked_balance += withdrawal_request.amount
+    wallet.save(update_fields=["balance", "locked_balance", "updated_at"])
+
+    withdrawal_request.status = WithdrawalRequest.Status.APPROVED
+    withdrawal_request.reviewed_by = staff_user
+    withdrawal_request.reviewed_at = timezone.now()
+
+    if staff_note:
+        withdrawal_request.staff_note = staff_note
+
+    withdrawal_request.save(
+        update_fields=[
+            "status",
+            "reviewed_by",
+            "reviewed_at",
+            "staff_note",
+            "updated_at",
+        ]
+    )
+
+    return withdrawal_request
+
+
+@transaction.atomic
+def reject_withdrawal_request(withdrawal_request: WithdrawalRequest, staff_user, staff_note=None):
+    withdrawal_request = WithdrawalRequest.objects.select_for_update().get(id=withdrawal_request.id)
+
+    if withdrawal_request.status not in [
+        WithdrawalRequest.Status.PENDING,
+        WithdrawalRequest.Status.APPROVED,
+    ]:
+        raise ValueError("Only pending or approved withdrawals can be rejected.")
+
+    wallet = UserWallet.objects.select_for_update().get(id=withdrawal_request.wallet_id)
+
+    if withdrawal_request.status == WithdrawalRequest.Status.APPROVED:
+        wallet.locked_balance -= withdrawal_request.amount
+        wallet.balance += withdrawal_request.amount
+        wallet.save(update_fields=["balance", "locked_balance", "updated_at"])
+
+    withdrawal_request.status = WithdrawalRequest.Status.REJECTED
+    withdrawal_request.reviewed_by = staff_user
+    withdrawal_request.reviewed_at = timezone.now()
+
+    if staff_note:
+        withdrawal_request.staff_note = staff_note
+
+    withdrawal_request.save(
+        update_fields=[
+            "status",
+            "reviewed_by",
+            "reviewed_at",
+            "staff_note",
+            "updated_at",
+        ]
+    )
+
+    return withdrawal_request
+
+
+@transaction.atomic
+def mark_withdrawal_paid(withdrawal_request: WithdrawalRequest, staff_user, staff_note=None):
+    withdrawal_request = WithdrawalRequest.objects.select_for_update().get(id=withdrawal_request.id)
+
+    if withdrawal_request.status != WithdrawalRequest.Status.APPROVED:
+        raise ValueError("Only approved withdrawals can be marked as paid.")
+
+    wallet = UserWallet.objects.select_for_update().get(id=withdrawal_request.wallet_id)
+
+    if wallet.locked_balance < withdrawal_request.amount:
+        raise ValueError("Locked balance is not enough for this withdrawal.")
+
+    balance_before = wallet.balance
+    locked_before = wallet.locked_balance
+
+    wallet.locked_balance -= withdrawal_request.amount
+    wallet.save(update_fields=["locked_balance", "updated_at"])
+
+    wallet_transaction = WalletTransaction.objects.create(
+        wallet=wallet,
+        user=withdrawal_request.user,
+        transaction_type=WalletTransaction.TransactionType.WITHDRAWAL,
+        amount=withdrawal_request.amount,
+        balance_before=balance_before,
+        balance_after=wallet.balance,
+        reference_table="withdrawal_requests",
+        reference_id=withdrawal_request.id,
+        description="Withdrawal paid",
+        created_by=staff_user,
+    )
+
+    withdrawal_request.status = WithdrawalRequest.Status.PAID
+    withdrawal_request.paid_by = staff_user
+    withdrawal_request.paid_at = timezone.now()
+
+    if staff_note:
+        withdrawal_request.staff_note = staff_note
+
+    withdrawal_request.save(
+        update_fields=[
+            "status",
+            "paid_by",
+            "paid_at",
+            "staff_note",
+            "updated_at",
+        ]
+    )
+
+    return withdrawal_request, wallet_transaction
