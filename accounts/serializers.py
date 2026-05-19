@@ -56,3 +56,33 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "email_verified",
         )
         read_only_fields = fields
+
+
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    username_field = "phone"
+
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+
+        token["name"] = user.name
+        token["phone"] = user.phone
+        token["role"] = user.role
+
+        return token
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+
+        data["user"] = {
+            "id": self.user.id,
+            "name": self.user.name,
+            "phone": self.user.phone,
+            "role": self.user.role,
+            "status": self.user.status,
+        }
+
+        return data
