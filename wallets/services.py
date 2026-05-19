@@ -1,9 +1,10 @@
-from notifications.services import create_notification
-from notifications.models import Notification
-from decimal import Decimal
-
 from django.db import transaction
 from django.utils import timezone
+
+from audit.models import AuditLog
+from audit.services import create_audit_log
+from notifications.models import Notification
+from notifications.services import create_notification
 
 from .models import DepositRequest, UserWallet, WalletTransaction, WithdrawalRequest
 
@@ -19,6 +20,14 @@ def assign_deposit_request(deposit_request: DepositRequest, staff_user):
     deposit_request.assigned_to = staff_user
     deposit_request.assigned_at = timezone.now()
     deposit_request.save(update_fields=["status", "assigned_to", "assigned_at", "updated_at"])
+
+    create_audit_log(
+        actor_user=staff_user,
+        action=AuditLog.ActionType.UPDATE,
+        target_table="deposit_requests",
+        target_id=deposit_request.id,
+        reason="Deposit request assigned for review.",
+    )
 
     return deposit_request
 
@@ -68,6 +77,7 @@ def approve_deposit_request(deposit_request: DepositRequest, staff_user, staff_n
             "updated_at",
         ]
     )
+
     create_notification(
         user=deposit_request.user,
         notification_type=Notification.NotificationType.DEPOSIT,
@@ -75,6 +85,14 @@ def approve_deposit_request(deposit_request: DepositRequest, staff_user, staff_n
         message=f"Your deposit of {deposit_request.amount} has been approved.",
         reference_table="deposit_requests",
         reference_id=deposit_request.id,
+    )
+
+    create_audit_log(
+        actor_user=staff_user,
+        action=AuditLog.ActionType.APPROVE,
+        target_table="deposit_requests",
+        target_id=deposit_request.id,
+        reason=staff_note,
     )
 
     return deposit_request, wallet_transaction
@@ -106,6 +124,7 @@ def reject_deposit_request(deposit_request: DepositRequest, staff_user, staff_no
             "updated_at",
         ]
     )
+
     create_notification(
         user=deposit_request.user,
         notification_type=Notification.NotificationType.DEPOSIT,
@@ -115,7 +134,16 @@ def reject_deposit_request(deposit_request: DepositRequest, staff_user, staff_no
         reference_id=deposit_request.id,
     )
 
+    create_audit_log(
+        actor_user=staff_user,
+        action=AuditLog.ActionType.REJECT,
+        target_table="deposit_requests",
+        target_id=deposit_request.id,
+        reason=staff_note,
+    )
+
     return deposit_request
+
 
 @transaction.atomic
 def approve_withdrawal_request(withdrawal_request: WithdrawalRequest, staff_user, staff_note=None):
@@ -148,6 +176,14 @@ def approve_withdrawal_request(withdrawal_request: WithdrawalRequest, staff_user
             "staff_note",
             "updated_at",
         ]
+    )
+
+    create_audit_log(
+        actor_user=staff_user,
+        action=AuditLog.ActionType.APPROVE,
+        target_table="withdrawal_requests",
+        target_id=withdrawal_request.id,
+        reason=staff_note,
     )
 
     return withdrawal_request
@@ -185,6 +221,14 @@ def reject_withdrawal_request(withdrawal_request: WithdrawalRequest, staff_user,
             "staff_note",
             "updated_at",
         ]
+    )
+
+    create_audit_log(
+        actor_user=staff_user,
+        action=AuditLog.ActionType.REJECT,
+        target_table="withdrawal_requests",
+        target_id=withdrawal_request.id,
+        reason=staff_note,
     )
 
     return withdrawal_request
@@ -236,6 +280,7 @@ def mark_withdrawal_paid(withdrawal_request: WithdrawalRequest, staff_user, staf
             "updated_at",
         ]
     )
+
     create_notification(
         user=withdrawal_request.user,
         notification_type=Notification.NotificationType.WITHDRAWAL,
@@ -244,4 +289,13 @@ def mark_withdrawal_paid(withdrawal_request: WithdrawalRequest, staff_user, staf
         reference_table="withdrawal_requests",
         reference_id=withdrawal_request.id,
     )
+
+    create_audit_log(
+        actor_user=staff_user,
+        action=AuditLog.ActionType.APPROVE,
+        target_table="withdrawal_requests",
+        target_id=withdrawal_request.id,
+        reason=staff_note or "Withdrawal marked as paid.",
+    )
+
     return withdrawal_request, wallet_transaction
