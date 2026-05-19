@@ -1,3 +1,5 @@
+from notifications.services import create_notification
+from notifications.models import Notification
 from decimal import Decimal
 
 from django.db import transaction
@@ -216,6 +218,15 @@ def approve_settlement(batch: SettlementBatch, admin_user):
         item.status = SettlementItem.Status.PAID
         item.paid_at = timezone.now()
         item.save(update_fields=["wallet_transaction", "status", "paid_at"])
+
+        create_notification(
+            user=item.user,
+            notification_type=Notification.NotificationType.SETTLEMENT,
+            title="Settlement Credited",
+            message=f"Your settlement of {item.settlement_amount} for {batch.result_period.code} has been credited.",
+            reference_table="settlement_items",
+            reference_id=item.id,
+        )
 
     batch.status = SettlementBatch.Status.PAID
     batch.approved_by = admin_user

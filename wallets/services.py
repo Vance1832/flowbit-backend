@@ -1,3 +1,5 @@
+from notifications.services import create_notification
+from notifications.models import Notification
 from decimal import Decimal
 
 from django.db import transaction
@@ -66,6 +68,14 @@ def approve_deposit_request(deposit_request: DepositRequest, staff_user, staff_n
             "updated_at",
         ]
     )
+    create_notification(
+        user=deposit_request.user,
+        notification_type=Notification.NotificationType.DEPOSIT,
+        title="Deposit Approved",
+        message=f"Your deposit of {deposit_request.amount} has been approved.",
+        reference_table="deposit_requests",
+        reference_id=deposit_request.id,
+    )
 
     return deposit_request, wallet_transaction
 
@@ -95,6 +105,14 @@ def reject_deposit_request(deposit_request: DepositRequest, staff_user, staff_no
             "staff_note",
             "updated_at",
         ]
+    )
+    create_notification(
+        user=deposit_request.user,
+        notification_type=Notification.NotificationType.DEPOSIT,
+        title="Deposit Rejected",
+        message=f"Your deposit request of {deposit_request.amount} has been rejected.",
+        reference_table="deposit_requests",
+        reference_id=deposit_request.id,
     )
 
     return deposit_request
@@ -185,7 +203,6 @@ def mark_withdrawal_paid(withdrawal_request: WithdrawalRequest, staff_user, staf
         raise ValueError("Locked balance is not enough for this withdrawal.")
 
     balance_before = wallet.balance
-    locked_before = wallet.locked_balance
 
     wallet.locked_balance -= withdrawal_request.amount
     wallet.save(update_fields=["locked_balance", "updated_at"])
@@ -219,5 +236,12 @@ def mark_withdrawal_paid(withdrawal_request: WithdrawalRequest, staff_user, staf
             "updated_at",
         ]
     )
-
+    create_notification(
+        user=withdrawal_request.user,
+        notification_type=Notification.NotificationType.WITHDRAWAL,
+        title="Withdrawal Paid",
+        message=f"Your withdrawal of {withdrawal_request.amount} has been paid.",
+        reference_table="withdrawal_requests",
+        reference_id=withdrawal_request.id,
+    )
     return withdrawal_request, wallet_transaction
