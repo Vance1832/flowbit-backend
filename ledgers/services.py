@@ -1,4 +1,6 @@
 from settlements.models import SettlementItem
+from audit.models import AuditLog
+from audit.services import create_audit_log
 
 
 def get_user_visible_results(user):
@@ -51,6 +53,7 @@ from settlements.services import create_settlement_preview
 @transaction.atomic
 def close_result_period(result_period, admin_user):
     result_period = result_period.__class__.objects.select_for_update().get(id=result_period.id)
+    previous_status = result_period.status
 
     if result_period.status not in [
         result_period.Status.OPEN,
@@ -69,12 +72,23 @@ def close_result_period(result_period, admin_user):
         ledger.manually_closed_at = timezone.now()
         ledger.save(update_fields=["status", "manually_closed_by", "manually_closed_at", "updated_at"])
 
+    create_audit_log(
+        actor_user=admin_user,
+        action=AuditLog.ActionType.CLOSE,
+        target_table="result_periods",
+        target_id=result_period.id,
+        old_values={"status": previous_status},
+        new_values={"status": result_period.status},
+        reason="Result period closed.",
+    )
+
     return result_period
 
 
 @transaction.atomic
 def enter_result_and_preview_settlement(result_period, result_number, admin_user):
     result_period = result_period.__class__.objects.select_for_update().get(id=result_period.id)
+    previous_status = result_period.status
 
     if result_period.status not in [
         result_period.Status.CLOSED,
@@ -89,6 +103,20 @@ def enter_result_and_preview_settlement(result_period, result_number, admin_user
         result_period=result_period,
         result_number=result_number,
         admin_user=admin_user,
+    )
+
+    create_audit_log(
+        actor_user=admin_user,
+        action=AuditLog.ActionType.RESULT_ENTRY,
+        target_table="result_periods",
+        target_id=result_period.id,
+        old_values={"status": previous_status},
+        new_values={
+            "status": result_period.Status.SETTLEMENT_PREVIEWED,
+            "result_number": batch.result_number,
+            "settlement_batch_id": batch.id,
+        },
+        reason="Result entered and settlement preview created.",
     )
 
     return batch

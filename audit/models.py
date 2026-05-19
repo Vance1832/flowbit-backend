@@ -6,6 +6,7 @@ class AuditLog(models.Model):
     class ActionType(models.TextChoices):
         CREATE = "create", "Create"
         UPDATE = "update", "Update"
+        CLOSE = "close", "Close"
         APPROVE = "approve", "Approve"
         REJECT = "reject", "Reject"
         VOID = "void", "Void"
@@ -14,6 +15,7 @@ class AuditLog(models.Model):
         DEACTIVATE = "deactivate", "Deactivate"
         CASHOUT = "cashout", "Cashout"
         OVERRIDE = "override", "Override"
+        RESERVE_DEPOSIT = "reserve_deposit", "Reserve Deposit"
         SETTLEMENT = "settlement", "Settlement"
         RESULT_ENTRY = "result_entry", "Result Entry"
         PASSWORD_RESET = "password_reset", "Password Reset"

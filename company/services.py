@@ -1,6 +1,8 @@
 from django.db import transaction
 from django.utils import timezone
 
+from audit.models import AuditLog
+from audit.services import create_audit_log
 from .models import CompanyWallet, CompanyWalletTransaction, CompanyCashoutRequest
 
 
@@ -22,6 +24,20 @@ def add_company_reserve(wallet: CompanyWallet, amount, admin_user, description=N
         created_by=admin_user,
     )
 
+    create_audit_log(
+        actor_user=admin_user,
+        action=AuditLog.ActionType.RESERVE_DEPOSIT,
+        target_table="company_wallet_transactions",
+        target_id=tx.id,
+        new_values={
+            "company_wallet_id": wallet.id,
+            "amount": str(amount),
+            "balance_before": str(before),
+            "balance_after": str(wallet.balance),
+        },
+        reason=description or "Company reserve deposit added.",
+    )
+
     return wallet, tx
 
 
@@ -40,6 +56,21 @@ def approve_company_cashout(cashout: CompanyCashoutRequest, owner_user, note=Non
         cashout.admin_note = note
 
     cashout.save(update_fields=["status", "approved_by", "approved_at", "admin_note", "updated_at"])
+
+    create_audit_log(
+        actor_user=owner_user,
+        action=AuditLog.ActionType.CASHOUT,
+        target_table="company_cashout_requests",
+        target_id=cashout.id,
+        old_values={"status": CompanyCashoutRequest.Status.PENDING},
+        new_values={
+            "status": cashout.status,
+            "approved_at": cashout.approved_at.isoformat() if cashout.approved_at else None,
+            "admin_note": cashout.admin_note,
+        },
+        reason=note or "Company cashout approved.",
+    )
+
     return cashout
 
 
@@ -59,7 +90,7 @@ def mark_company_cashout_paid(cashout: CompanyCashoutRequest, owner_user, note=N
     wallet.balance -= cashout.amount
     wallet.save(update_fields=["balance", "updated_at"])
 
-    CompanyWalletTransaction.objects.create(
+    wallet_tx = CompanyWalletTransaction.objects.create(
         company_wallet=wallet,
         transaction_type=CompanyWalletTransaction.TransactionType.COMPANY_CASHOUT,
         amount=cashout.amount,
@@ -78,4 +109,20 @@ def mark_company_cashout_paid(cashout: CompanyCashoutRequest, owner_user, note=N
         cashout.admin_note = note
 
     cashout.save(update_fields=["status", "paid_at", "admin_note", "updated_at"])
+
+    create_audit_log(
+        actor_user=owner_user,
+        action=AuditLog.ActionType.CASHOUT,
+        target_table="company_cashout_requests",
+        target_id=cashout.id,
+        old_values={"status": CompanyCashoutRequest.Status.APPROVED},
+        new_values={
+            "status": cashout.status,
+            "paid_at": cashout.paid_at.isoformat() if cashout.paid_at else None,
+            "admin_note": cashout.admin_note,
+            "wallet_transaction_id": wallet_tx.id,
+        },
+        reason=note or "Company cashout marked as paid.",
+    )
+
     return cashout

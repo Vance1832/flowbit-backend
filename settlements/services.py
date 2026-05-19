@@ -2,6 +2,8 @@ from notifications.services import create_notification
 from notifications.models import Notification
 from decimal import Decimal
 
+from audit.models import AuditLog
+from audit.services import create_audit_log
 from django.db import transaction
 from django.utils import timezone
 
@@ -141,6 +143,22 @@ def create_settlement_preview(result_period: ResultPeriod, result_number: str, a
         ]
     )
 
+    create_audit_log(
+        actor_user=admin_user,
+        action=AuditLog.ActionType.SETTLEMENT,
+        target_table="settlement_batches",
+        target_id=batch.id,
+        new_values={
+            "result_period_id": result_period.id,
+            "result_number": result_number,
+            "status": batch.status,
+            "total_collected": str(batch.total_collected),
+            "total_settlement": str(batch.total_settlement),
+            "company_reserve_required": str(batch.company_reserve_required),
+        },
+        reason="Settlement preview created.",
+    )
+
     return batch
 
 
@@ -152,6 +170,8 @@ def approve_settlement(batch: SettlementBatch, admin_user):
     """
 
     batch = SettlementBatch.objects.select_for_update().get(id=batch.id)
+
+    previous_status = batch.status
 
     if batch.status == SettlementBatch.Status.PAID:
         raise ValueError("Settlement batch is already paid.")
@@ -244,5 +264,23 @@ def approve_settlement(batch: SettlementBatch, admin_user):
 
     batch.result_period.status = ResultPeriod.Status.SETTLED
     batch.result_period.save(update_fields=["status", "updated_at"])
+
+    create_audit_log(
+        actor_user=admin_user,
+        action=AuditLog.ActionType.SETTLEMENT,
+        target_table="settlement_batches",
+        target_id=batch.id,
+        old_values={
+            "status": previous_status,
+            "company_reserve_used": "0.00",
+        },
+        new_values={
+            "status": batch.status,
+            "company_reserve_used": str(batch.company_reserve_used),
+            "paid_at": batch.paid_at.isoformat() if batch.paid_at else None,
+            "approved_at": batch.approved_at.isoformat() if batch.approved_at else None,
+        },
+        reason="Settlement approved and paid.",
+    )
 
     return batch
