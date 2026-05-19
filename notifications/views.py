@@ -2,6 +2,7 @@ from django.utils import timezone
 
 from rest_framework import generics, permissions
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 
 from .models import Notification
@@ -19,7 +20,7 @@ class MyNotificationListView(generics.ListAPIView):
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def mark_notification_read(request, pk):
-    notification = Notification.objects.get(pk=pk, user=request.user)
+    notification = get_object_or_404(Notification, pk=pk, user=request.user)
     notification.is_read = True
     notification.read_at = timezone.now()
     notification.save(update_fields=["is_read", "read_at"])

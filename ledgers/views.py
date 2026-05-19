@@ -1,5 +1,6 @@
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -73,15 +74,18 @@ class AdminLedgerNumberListView(generics.ListAPIView):
 @api_view(["POST"])
 @permission_classes([IsAdminOwner])
 def admin_close_result_period(request, pk):
-    result_period = ResultPeriod.objects.get(pk=pk)
-    result_period = close_result_period(result_period, request.user)
+    result_period = get_object_or_404(ResultPeriod, pk=pk)
+    try:
+        result_period = close_result_period(result_period, request.user)
+    except ValueError as error:
+        return Response({"detail": str(error)}, status=status.HTTP_400_BAD_REQUEST)
     return Response(ResultPeriodSerializer(result_period).data)
 
 
 @api_view(["POST"])
 @permission_classes([IsAdminOwner])
 def admin_enter_result(request, pk):
-    result_period = ResultPeriod.objects.get(pk=pk)
+    result_period = get_object_or_404(ResultPeriod, pk=pk)
 
     serializer = EnterResultSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)

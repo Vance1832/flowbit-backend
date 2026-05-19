@@ -1,5 +1,6 @@
-from rest_framework import generics, status
+from rest_framework import generics, serializers, status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 
 from accounts.permissions import IsAdminOwner, IsOwner
@@ -32,7 +33,7 @@ class CompanyWalletTransactionListView(generics.ListAPIView):
 @api_view(["POST"])
 @permission_classes([IsAdminOwner])
 def admin_add_company_reserve(request, pk):
-    wallet = CompanyWallet.objects.get(pk=pk)
+    wallet = get_object_or_404(CompanyWallet, pk=pk)
 
     serializer = ReserveDepositSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -56,13 +57,17 @@ class CompanyCashoutRequestListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         wallet = CompanyWallet.objects.first()
+        if wallet is None:
+            raise serializers.ValidationError(
+                {"detail": "Company wallet does not exist."}
+            )
         serializer.save(company_wallet=wallet, requested_by=self.request.user)
 
 
 @api_view(["POST"])
 @permission_classes([IsOwner])
 def owner_approve_company_cashout(request, pk):
-    cashout = CompanyCashoutRequest.objects.get(pk=pk)
+    cashout = get_object_or_404(CompanyCashoutRequest, pk=pk)
 
     try:
         cashout = approve_company_cashout(
@@ -79,7 +84,7 @@ def owner_approve_company_cashout(request, pk):
 @api_view(["POST"])
 @permission_classes([IsOwner])
 def owner_mark_company_cashout_paid(request, pk):
-    cashout = CompanyCashoutRequest.objects.get(pk=pk)
+    cashout = get_object_or_404(CompanyCashoutRequest, pk=pk)
 
     try:
         cashout = mark_company_cashout_paid(

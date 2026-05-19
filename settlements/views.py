@@ -1,5 +1,6 @@
 from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 
 from accounts.permissions import IsAdminOwner, IsOwner
@@ -25,7 +26,7 @@ class AdminSettlementBatchDetailView(generics.RetrieveAPIView):
 @api_view(["POST"])
 @permission_classes([IsOwner])
 def admin_approve_settlement(request, pk):
-    batch = SettlementBatch.objects.get(pk=pk)
+    batch = get_object_or_404(SettlementBatch, pk=pk)
 
     try:
         approved_batch = approve_settlement(batch=batch, admin_user=request.user)

@@ -1,5 +1,6 @@
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.generics import get_object_or_404
 from accounts.permissions import IsStaffAdminOwner
 from .services import (
     assign_deposit_request,
@@ -79,8 +80,11 @@ class AdminDepositRequestListView(generics.ListAPIView):
 @api_view(["POST"])
 @permission_classes([IsStaffAdminOwner])
 def admin_assign_deposit(request, pk):
-    deposit = DepositRequest.objects.get(pk=pk)
-    deposit = assign_deposit_request(deposit, request.user)
+    deposit = get_object_or_404(DepositRequest, pk=pk)
+    try:
+        deposit = assign_deposit_request(deposit, request.user)
+    except ValueError as error:
+        return Response({"detail": str(error)}, status=status.HTTP_400_BAD_REQUEST)
     serializer = DepositRequestSerializer(deposit)
     return Response(serializer.data)
 
@@ -88,9 +92,12 @@ def admin_assign_deposit(request, pk):
 @api_view(["POST"])
 @permission_classes([IsStaffAdminOwner])
 def admin_approve_deposit(request, pk):
-    deposit = DepositRequest.objects.get(pk=pk)
+    deposit = get_object_or_404(DepositRequest, pk=pk)
     staff_note = request.data.get("staff_note")
-    deposit, wallet_tx = approve_deposit_request(deposit, request.user, staff_note)
+    try:
+        deposit, wallet_tx = approve_deposit_request(deposit, request.user, staff_note)
+    except ValueError as error:
+        return Response({"detail": str(error)}, status=status.HTTP_400_BAD_REQUEST)
     serializer = DepositRequestSerializer(deposit)
     return Response(serializer.data)
 
@@ -98,9 +105,12 @@ def admin_approve_deposit(request, pk):
 @api_view(["POST"])
 @permission_classes([IsStaffAdminOwner])
 def admin_reject_deposit(request, pk):
-    deposit = DepositRequest.objects.get(pk=pk)
+    deposit = get_object_or_404(DepositRequest, pk=pk)
     staff_note = request.data.get("staff_note")
-    deposit = reject_deposit_request(deposit, request.user, staff_note)
+    try:
+        deposit = reject_deposit_request(deposit, request.user, staff_note)
+    except ValueError as error:
+        return Response({"detail": str(error)}, status=status.HTTP_400_BAD_REQUEST)
     serializer = DepositRequestSerializer(deposit)
     return Response(serializer.data)
 
@@ -116,9 +126,12 @@ class AdminWithdrawalRequestListView(generics.ListAPIView):
 @api_view(["POST"])
 @permission_classes([IsStaffAdminOwner])
 def admin_approve_withdrawal(request, pk):
-    withdrawal = WithdrawalRequest.objects.get(pk=pk)
+    withdrawal = get_object_or_404(WithdrawalRequest, pk=pk)
     staff_note = request.data.get("staff_note")
-    withdrawal = approve_withdrawal_request(withdrawal, request.user, staff_note)
+    try:
+        withdrawal = approve_withdrawal_request(withdrawal, request.user, staff_note)
+    except ValueError as error:
+        return Response({"detail": str(error)}, status=status.HTTP_400_BAD_REQUEST)
     serializer = WithdrawalRequestSerializer(withdrawal)
     return Response(serializer.data)
 
@@ -126,9 +139,12 @@ def admin_approve_withdrawal(request, pk):
 @api_view(["POST"])
 @permission_classes([IsStaffAdminOwner])
 def admin_reject_withdrawal(request, pk):
-    withdrawal = WithdrawalRequest.objects.get(pk=pk)
+    withdrawal = get_object_or_404(WithdrawalRequest, pk=pk)
     staff_note = request.data.get("staff_note")
-    withdrawal = reject_withdrawal_request(withdrawal, request.user, staff_note)
+    try:
+        withdrawal = reject_withdrawal_request(withdrawal, request.user, staff_note)
+    except ValueError as error:
+        return Response({"detail": str(error)}, status=status.HTTP_400_BAD_REQUEST)
     serializer = WithdrawalRequestSerializer(withdrawal)
     return Response(serializer.data)
 
@@ -136,8 +152,11 @@ def admin_reject_withdrawal(request, pk):
 @api_view(["POST"])
 @permission_classes([IsStaffAdminOwner])
 def admin_mark_withdrawal_paid(request, pk):
-    withdrawal = WithdrawalRequest.objects.get(pk=pk)
+    withdrawal = get_object_or_404(WithdrawalRequest, pk=pk)
     staff_note = request.data.get("staff_note")
-    withdrawal, wallet_tx = mark_withdrawal_paid(withdrawal, request.user, staff_note)
+    try:
+        withdrawal, wallet_tx = mark_withdrawal_paid(withdrawal, request.user, staff_note)
+    except ValueError as error:
+        return Response({"detail": str(error)}, status=status.HTTP_400_BAD_REQUEST)
     serializer = WithdrawalRequestSerializer(withdrawal)
     return Response(serializer.data)
