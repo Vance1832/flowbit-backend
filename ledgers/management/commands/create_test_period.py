@@ -135,6 +135,7 @@ class Command(BaseCommand):
                 .select_related("wallet_transaction")
                 .filter(settlement_batch=batch)
             )
+            settlement_wallet_transactions = []
 
             for item in settlement_items:
                 if not item.wallet_transaction_id:
@@ -144,7 +145,7 @@ class Command(BaseCommand):
                 wallet = UserWallet.objects.select_for_update().get(id=wallet_tx.wallet_id)
                 wallet.balance -= wallet_tx.amount
                 wallet.save(update_fields=["balance", "updated_at"])
-                wallet_tx.delete()
+                settlement_wallet_transactions.append(wallet_tx)
 
             funding_transactions = list(
                 CompanyWalletTransaction.objects
@@ -166,6 +167,10 @@ class Command(BaseCommand):
                 settlement_item__settlement_batch=batch
             ).delete()
             SettlementItem.objects.filter(settlement_batch=batch).delete()
+
+            for wallet_tx in settlement_wallet_transactions:
+                wallet_tx.delete()
+
             batch.delete()
 
     def _reset_receipt_data(self, result_period):
