@@ -41,3 +41,54 @@ def get_user_visible_results(user):
         results.append(data)
 
     return results
+
+from django.db import transaction
+from django.utils import timezone
+
+from settlements.services import create_settlement_preview
+
+
+@transaction.atomic
+def close_result_period(result_period, admin_user):
+    result_period = result_period.__class__.objects.select_for_update().get(id=result_period.id)
+
+    if result_period.status not in [
+        result_period.Status.OPEN,
+        result_period.Status.CLOSED,
+    ]:
+        raise ValueError("Only open or closed result periods can be closed.")
+
+    result_period.status = result_period.Status.CLOSED
+    result_period.save(update_fields=["status", "updated_at"])
+
+    ledgers = result_period.ledgers.select_for_update().filter(status="open")
+
+    for ledger in ledgers:
+        ledger.status = "closed"
+        ledger.manually_closed_by = admin_user
+        ledger.manually_closed_at = timezone.now()
+        ledger.save(update_fields=["status", "manually_closed_by", "manually_closed_at", "updated_at"])
+
+    return result_period
+
+
+@transaction.atomic
+def enter_result_and_preview_settlement(result_period, result_number, admin_user):
+    result_period = result_period.__class__.objects.select_for_update().get(id=result_period.id)
+
+    if result_period.status not in [
+        result_period.Status.CLOSED,
+        result_period.Status.OPEN,
+    ]:
+        raise ValueError("Result can only be entered for open or closed result periods.")
+
+    if result_period.status == result_period.Status.OPEN:
+        close_result_period(result_period, admin_user)
+
+    batch = create_settlement_preview(
+        result_period=result_period,
+        result_number=result_number,
+        admin_user=admin_user,
+    )
+
+    return batch
