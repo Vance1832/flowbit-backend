@@ -1,3 +1,15 @@
+from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
+from accounts.permissions import IsStaffAdminOwner
+from .services import (
+    assign_deposit_request,
+    approve_deposit_request,
+    reject_deposit_request,
+    approve_withdrawal_request,
+    reject_withdrawal_request,
+    mark_withdrawal_paid,
+)
+
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -55,3 +67,77 @@ class WithdrawalRequestListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         wallet, _ = UserWallet.objects.get_or_create(user=self.request.user)
         serializer.save(user=self.request.user, wallet=wallet)
+
+class AdminDepositRequestListView(generics.ListAPIView):
+    serializer_class = DepositRequestSerializer
+    permission_classes = [IsStaffAdminOwner]
+
+    def get_queryset(self):
+        return DepositRequest.objects.all().order_by("-created_at")
+
+
+@api_view(["POST"])
+@permission_classes([IsStaffAdminOwner])
+def admin_assign_deposit(request, pk):
+    deposit = DepositRequest.objects.get(pk=pk)
+    deposit = assign_deposit_request(deposit, request.user)
+    serializer = DepositRequestSerializer(deposit)
+    return Response(serializer.data)
+
+
+@api_view(["POST"])
+@permission_classes([IsStaffAdminOwner])
+def admin_approve_deposit(request, pk):
+    deposit = DepositRequest.objects.get(pk=pk)
+    staff_note = request.data.get("staff_note")
+    deposit, wallet_tx = approve_deposit_request(deposit, request.user, staff_note)
+    serializer = DepositRequestSerializer(deposit)
+    return Response(serializer.data)
+
+
+@api_view(["POST"])
+@permission_classes([IsStaffAdminOwner])
+def admin_reject_deposit(request, pk):
+    deposit = DepositRequest.objects.get(pk=pk)
+    staff_note = request.data.get("staff_note")
+    deposit = reject_deposit_request(deposit, request.user, staff_note)
+    serializer = DepositRequestSerializer(deposit)
+    return Response(serializer.data)
+
+
+class AdminWithdrawalRequestListView(generics.ListAPIView):
+    serializer_class = WithdrawalRequestSerializer
+    permission_classes = [IsStaffAdminOwner]
+
+    def get_queryset(self):
+        return WithdrawalRequest.objects.all().order_by("-created_at")
+
+
+@api_view(["POST"])
+@permission_classes([IsStaffAdminOwner])
+def admin_approve_withdrawal(request, pk):
+    withdrawal = WithdrawalRequest.objects.get(pk=pk)
+    staff_note = request.data.get("staff_note")
+    withdrawal = approve_withdrawal_request(withdrawal, request.user, staff_note)
+    serializer = WithdrawalRequestSerializer(withdrawal)
+    return Response(serializer.data)
+
+
+@api_view(["POST"])
+@permission_classes([IsStaffAdminOwner])
+def admin_reject_withdrawal(request, pk):
+    withdrawal = WithdrawalRequest.objects.get(pk=pk)
+    staff_note = request.data.get("staff_note")
+    withdrawal = reject_withdrawal_request(withdrawal, request.user, staff_note)
+    serializer = WithdrawalRequestSerializer(withdrawal)
+    return Response(serializer.data)
+
+
+@api_view(["POST"])
+@permission_classes([IsStaffAdminOwner])
+def admin_mark_withdrawal_paid(request, pk):
+    withdrawal = WithdrawalRequest.objects.get(pk=pk)
+    staff_note = request.data.get("staff_note")
+    withdrawal, wallet_tx = mark_withdrawal_paid(withdrawal, request.user, staff_note)
+    serializer = WithdrawalRequestSerializer(withdrawal)
+    return Response(serializer.data)
