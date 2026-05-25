@@ -1,6 +1,8 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+
 from .managers import UserManager
+from .validators import normalize_phone_parts
 
 
 class User(AbstractUser):
@@ -42,19 +44,17 @@ class User(AbstractUser):
     REQUIRED_FIELDS = ["name"]
 
     def save(self, *args, **kwargs):
-        country_code = self.phone_country_code.strip()
-        number = self.phone_number.strip().replace(" ", "").replace("-", "")
-
-        if not country_code.startswith("+"):
-            country_code = "+" + country_code
-
-        # remove first 0 for international format
-        if number.startswith("0"):
-            number = number[1:]
+        country_code, number, full_phone = normalize_phone_parts(
+            self.phone_country_code,
+            self.phone_number,
+        )
 
         self.phone_country_code = country_code
         self.phone_number = number
-        self.phone = f"{country_code}{number}"
+        self.phone = full_phone
+
+        if self.email == "":
+            self.email = None
 
         super().save(*args, **kwargs)
 

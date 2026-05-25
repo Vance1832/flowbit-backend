@@ -7,6 +7,8 @@ from rest_framework.views import APIView
 from accounts.permissions import IsAdminOwner
 from .models import ResultPeriod, Ledger, LedgerNumber
 from .serializers import (
+    UserCurrentResultPeriodSerializer,
+    UserResultOverviewSerializer,
     UserVisibleResultSerializer,
     ResultPeriodSerializer,
     LedgerSerializer,
@@ -14,10 +16,22 @@ from .serializers import (
     EnterResultSerializer,
 )
 from .services import (
+    get_user_current_result_period,
+    get_user_result_overview,
     get_user_visible_results,
     close_result_period,
     enter_result_and_preview_settlement,
 )
+
+
+class UserCurrentResultPeriodView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        period = get_user_current_result_period()
+        if period is None:
+            return Response({"detail": "No open result period found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(UserCurrentResultPeriodSerializer(period).data)
 
 
 class UserResultListView(APIView):
@@ -26,6 +40,14 @@ class UserResultListView(APIView):
     def get(self, request):
         results = get_user_visible_results(request.user)
         return Response(results)
+
+
+class UserResultOverviewView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        overview = get_user_result_overview(request.user)
+        return Response(UserResultOverviewSerializer(overview).data)
 
 
 class AdminResultPeriodListCreateView(generics.ListCreateAPIView):

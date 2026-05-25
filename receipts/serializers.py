@@ -18,6 +18,7 @@ class ReceiptItemSerializer(serializers.ModelSerializer):
 
 class ReceiptSerializer(serializers.ModelSerializer):
     items = ReceiptItemSerializer(many=True, read_only=True)
+    result_period_code = serializers.CharField(source="result_period.code", read_only=True)
 
     class Meta:
         model = Receipt
@@ -25,6 +26,7 @@ class ReceiptSerializer(serializers.ModelSerializer):
             "id",
             "receipt_no",
             "result_period",
+            "result_period_code",
             "total_amount",
             "status",
             "paid_at",
@@ -47,8 +49,8 @@ class SubmitReceiptItemSerializer(serializers.Serializer):
         return value
 
     def validate_amount(self, value):
-        if value <= 0:
-            raise serializers.ValidationError("Amount must be greater than zero.")
+        if value < 500:
+            raise serializers.ValidationError("Minimum amount is 500.")
 
         return value
 

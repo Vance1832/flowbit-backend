@@ -32,10 +32,17 @@ class WalletTransactionSerializer(serializers.ModelSerializer):
 
 
 class DepositRequestSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source="user.name", read_only=True)
+    user_phone = serializers.CharField(source="user.phone", read_only=True)
+    assigned_to_name = serializers.CharField(source="assigned_to.name", read_only=True)
+    reviewed_by_name = serializers.CharField(source="reviewed_by.name", read_only=True)
+
     class Meta:
         model = DepositRequest
         fields = (
             "id",
+            "user_name",
+            "user_phone",
             "amount",
             "payment_method",
             "sender_account_name",
@@ -45,8 +52,10 @@ class DepositRequestSerializer(serializers.ModelSerializer):
             "staff_note",
             "status",
             "assigned_to",
+            "assigned_to_name",
             "assigned_at",
             "reviewed_by",
+            "reviewed_by_name",
             "reviewed_at",
             "created_at",
             "updated_at",
@@ -70,10 +79,17 @@ class DepositRequestSerializer(serializers.ModelSerializer):
 
 
 class WithdrawalRequestSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source="user.name", read_only=True)
+    user_phone = serializers.CharField(source="user.phone", read_only=True)
+    reviewed_by_name = serializers.CharField(source="reviewed_by.name", read_only=True)
+    paid_by_name = serializers.CharField(source="paid_by.name", read_only=True)
+
     class Meta:
         model = WithdrawalRequest
         fields = (
             "id",
+            "user_name",
+            "user_phone",
             "amount",
             "payment_account_name",
             "payment_account_number",
@@ -82,8 +98,10 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
             "staff_note",
             "status",
             "reviewed_by",
+            "reviewed_by_name",
             "reviewed_at",
             "paid_by",
+            "paid_by_name",
             "paid_at",
             "created_at",
             "updated_at",
@@ -101,7 +119,7 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
         )
 
     def validate_amount(self, value):
-        if value < 10000:
-            raise serializers.ValidationError("Minimum withdrawal amount is 10000.")
+        if value < 1000:
+            raise serializers.ValidationError("Minimum withdrawal amount is 1000.")
         return value
     

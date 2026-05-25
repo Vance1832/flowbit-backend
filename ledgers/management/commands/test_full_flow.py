@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from accounts.models import User
@@ -12,9 +13,9 @@ from company.services import add_company_reserve
 from ledgers.models import LedgerNumber, ResultPeriod
 from ledgers.services import enter_result_and_preview_settlement, get_user_visible_results
 from notifications.models import Notification
-from receipts.models import PaidNumberAllocation, Receipt, ReceiptItem
+from receipts.models import PaidNumberAllocation, Receipt, ReceiptItem, RGeneratedGroup, RGeneratedItem
 from receipts.services import create_paid_receipt
-from settlements.models import SettlementBatch, SettlementItem
+from settlements.models import SettlementBatch, SettlementItem, SettlementItemSource
 from settlements.services import approve_settlement
 from wallets.models import DepositRequest, UserWallet, WalletTransaction, WithdrawalRequest
 from wallets.services import approve_deposit_request
@@ -232,11 +233,50 @@ class Command(BaseCommand):
     @transaction.atomic
     def _reset_test_user_state(self, test_user):
         wallet, _ = UserWallet.objects.select_for_update().get_or_create(user=test_user)
+        wallet_transaction_ids = list(
+            WalletTransaction.objects.filter(user=test_user).values_list("id", flat=True)
+        )
+
+        settlement_items = SettlementItem.objects.filter(
+            user=test_user,
+        ) | SettlementItem.objects.filter(
+            wallet_transaction_id__in=wallet_transaction_ids
+        )
+        settlement_items = settlement_items.distinct()
+        settlement_item_ids = list(settlement_items.values_list("id", flat=True))
+
+        test_batch_ids = list(
+            SettlementBatch.objects.filter(
+                result_period__code__startswith="TEST",
+                items__id__in=settlement_item_ids,
+            ).values_list("id", flat=True).distinct()
+        )
+
+        receipt_ids = list(
+            Receipt.objects.filter(user=test_user).values_list("id", flat=True)
+        )
+        receipt_item_ids = list(
+            ReceiptItem.objects.filter(receipt_id__in=receipt_ids).values_list("id", flat=True)
+        )
 
         Notification.objects.filter(user=test_user).delete()
+        AuditLog.objects.filter(actor_user=test_user).delete()
+
+        SettlementItemSource.objects.filter(settlement_item_id__in=settlement_item_ids).delete()
+        SettlementItem.objects.filter(id__in=settlement_item_ids).delete()
+        SettlementBatch.objects.filter(id__in=test_batch_ids).delete()
+
+        PaidNumberAllocation.objects.filter(receipt_item_id__in=receipt_item_ids).delete()
+        RGeneratedItem.objects.filter(
+            Q(group__receipt_id__in=receipt_ids) | Q(receipt_item_id__in=receipt_item_ids)
+        ).delete()
+        RGeneratedGroup.objects.filter(receipt_id__in=receipt_ids).delete()
+        ReceiptItem.objects.filter(id__in=receipt_item_ids).delete()
+        Receipt.objects.filter(id__in=receipt_ids).delete()
+
+        WalletTransaction.objects.filter(user=test_user).delete()
         DepositRequest.objects.filter(user=test_user).delete()
         WithdrawalRequest.objects.filter(user=test_user).delete()
-        WalletTransaction.objects.filter(user=test_user).delete()
 
         wallet.balance = Decimal("0.00")
         wallet.locked_balance = Decimal("0.00")

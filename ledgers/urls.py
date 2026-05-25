@@ -1,5 +1,7 @@
 from django.urls import path
 from .views import (
+    UserCurrentResultPeriodView,
+    UserResultOverviewView,
     UserResultListView,
     AdminResultPeriodListCreateView,
     AdminResultPeriodDetailView,
@@ -12,6 +14,8 @@ from .views import (
 
 
 urlpatterns = [
+    path("current-period/", UserCurrentResultPeriodView.as_view(), name="user-current-result-period"),
+    path("results-overview/", UserResultOverviewView.as_view(), name="user-results-overview"),
     path("results/", UserResultListView.as_view(), name="user-results"),
 
     path("admin/result-periods/", AdminResultPeriodListCreateView.as_view(), name="admin-result-periods"),

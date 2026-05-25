@@ -9,12 +9,17 @@ class CompanyWalletSerializer(serializers.ModelSerializer):
 
 
 class CompanyWalletTransactionSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source="created_by.name", read_only=True)
+
     class Meta:
         model = CompanyWalletTransaction
         fields = "__all__"
 
 
 class CompanyCashoutRequestSerializer(serializers.ModelSerializer):
+    requested_by_name = serializers.CharField(source="requested_by.name", read_only=True)
+    approved_by_name = serializers.CharField(source="approved_by.name", read_only=True)
+
     class Meta:
         model = CompanyCashoutRequest
         fields = "__all__"

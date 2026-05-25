@@ -242,7 +242,6 @@ def mark_withdrawal_paid(withdrawal_request: WithdrawalRequest, staff_user, staf
         raise ValueError("Only approved withdrawals can be marked as paid.")
 
     wallet = UserWallet.objects.select_for_update().get(id=withdrawal_request.wallet_id)
-
     if wallet.locked_balance < withdrawal_request.amount:
         raise ValueError("Locked balance is not enough for this withdrawal.")
 
